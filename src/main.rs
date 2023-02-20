@@ -9,17 +9,21 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-   /// Path to the input VCF
+   /// Path to the input VCF or "-" to read from STDIN
    #[arg(short, long)]
    input: String,
 
-   /// Path to the output VCF
+   /// Path to the output VCF or "-" to write to STDOUT
    #[arg(short, long)]
    output: String,
 
    /// The INFO fields to copy over to FORMAT tag
    #[arg(short, long)]
    fields: Vec<String>,
+
+   /// Transfer also the QUAL tag into FORMAT
+   #[arg(short, long)]
+   qual: bool,
 
    /// Show verbose output (sets log-level to debug or trace)
    #[arg(short, long, action = clap::ArgAction::Count)]
@@ -51,13 +55,14 @@ fn main() {
     log::set_max_level(log::LevelFilter::Info)
   }
 
+  if args.fields.len() == 0 && !args.qual {
+		error!("No field for conversion identified. Use '-q' or '-f' options");
+		return;
+	}
+
   let mut fields : BTreeSet<String> = args.fields.iter()
 		.map(|x| x.to_owned())
 		.collect();
-  if fields.len() == 0 {
-		error!("Error: needs at least one field to convert");
-		return;
-	}
 
 	// Open the BAM File and extract information from the header
 	let mut input = if args.input == "-" {
@@ -114,6 +119,13 @@ fn main() {
 			return;
 		}
 	}
+
+	if args.qual {
+	  let new_record = "##FORMAT=<ID=QUAL,Number=1,Type=Float,Description=Phred-scaled quality score for the assertion made in ALT>";
+		trace!("Adding new FORMAT header record: {}", new_record);
+		new_header.push_record(new_record.as_bytes());
+	}
+
 
   let mut output = if args.output == "-" {
     debug!("Writing to STDOUT");
@@ -200,6 +212,11 @@ fn main() {
 				}
 			}
 		}
+		if args.qual {
+		  let q = [rec.qual()];
+      rec.push_format_float("QUAL".as_bytes(), &q).expect("Can not store Float in the format");
+		}
+
 
     // Write the record to the output stream
 		output.write(&rec).expect("Can not write record to output stream");
