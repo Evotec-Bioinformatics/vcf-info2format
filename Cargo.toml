@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0.0", features = ["derive"] }
-rust-htslib = { version = "*", default-features = false }
+rust-htslib = { version = "0.40.2", default-features = false }
 log = "*"
 env_logger = "*"
